@@ -23,10 +23,10 @@ export function TextField<T extends FieldValues>({
   return (
     <div
       style={{
-        marginBottom: 16,
         flex: 1,
         display: "flex",
         flexDirection: "column",
+        textAlign: "start",
         ...(containerStyle || {}),
       }}
     >

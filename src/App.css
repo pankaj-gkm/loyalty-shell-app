@@ -4,9 +4,11 @@ body {
 
 #root {
   max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
   text-align: center;
+  min-width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .logo {
@@ -47,10 +49,7 @@ body {
 
 .redirectField {
   height: auto;
-  max-height: 50px;
+  max-height: 150px;
+  overflow: scroll;
   transition: all 0.5s ease-in-out;
-}
-
-.redirectField:hover {
-  max-height: 1000px;
 }

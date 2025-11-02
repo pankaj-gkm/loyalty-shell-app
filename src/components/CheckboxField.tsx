@@ -17,32 +17,25 @@ export function CheckboxField<T extends FieldValues>({
   name,
   control,
   label,
-  style = {},
+  onChange,
   ...props
 }: CheckboxFieldProps<T>) {
   return (
-    <div style={{ marginBottom: 16, ...style }}>
+    <div>
       <label
         style={{ fontSize: 14, display: "flex", alignItems: "center", gap: 8 }}
       >
         <Controller
           name={name}
           control={control}
-          render={({
-            field,
-          }: {
-            field: {
-              value: boolean;
-              onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-              onBlur: () => void;
-              ref: React.Ref<HTMLInputElement>;
-              name: string;
-            };
-          }) => (
+          render={({ field }) => (
             <input
               type="checkbox"
               checked={!!field.value}
-              onChange={field.onChange}
+              onChange={(...props) => {
+                onChange?.(...props);
+                field.onChange(...props);
+              }}
               onBlur={field.onBlur}
               ref={field.ref}
               name={field.name}
