@@ -51,6 +51,7 @@ const QUICK_LINKS = [
   { link: "http://localhost:5173", name: "5173" },
   { link: "http://localhost:4173", name: "4173" },
   { link: "https://stage2.kstore.global/", name: "stage2" },
+  { link: "https://stage3.kstore.global/", name: "stage3" },
 ];
 
 const DEFAULT_VALUES = {
@@ -58,6 +59,8 @@ const DEFAULT_VALUES = {
   userId: "efd19263-aaae-433e-9fea-a302b5d73ce6",
   useCustomBaseUrl: getLocalValue("useCustomBaseUrl", true),
   customBaseUrl: getLocalValue("customBaseUrl", "http:localhost:5173"),
+  productId: "",
+  lang: "en",
 };
 
 type Form = {
@@ -71,6 +74,8 @@ type Form = {
   customBaseUrl: string;
   clientId: string;
   clientSecret: string;
+  productId: string | undefined;
+  lang: string | undefined;
 };
 
 const handleFormValues = (
@@ -107,7 +112,11 @@ const Dashboard = ({
 }) => {
   const form = useForm<Form>({
     defaultValues: handleFormValues(
-      { ...DEFAULT_VALUES, ...CLIENT_ID_MAP[storeIdentifier] },
+      {
+        ...DEFAULT_VALUES,
+        ...CLIENT_ID_MAP[storeIdentifier],
+        productId: STORE_MAP["ht-kstore-india"]?.products[0]?.value,
+      },
       storeIdentifier
     ),
   });
@@ -170,6 +179,8 @@ const Dashboard = ({
       continueCtaTitle: p(values.continueCtaTitle),
       continueCtaRedirectionUrl: p(values.continueCtaUrl),
       orderHistoryRedirectionUrl: p(values.orderHistoryRedirectionUrl),
+      lang: p(values.lang),
+      productId: p(values.productId),
       sessionToken: p(iframeOptions.token),
     })
       .map(([key, value]) => (value ? ([key, value] as const) : undefined))
@@ -271,6 +282,19 @@ const Dashboard = ({
             name="clientSecret"
             label="Client Secret"
           />
+        </div>
+
+        <div style={styles.row}>
+          {STORE_MAP[storeIdentifier].products.length ? (
+            <SelectField
+              label="Product"
+              options={STORE_MAP[storeIdentifier].products}
+              onChange={({ target: { value } }) => {
+                form.setValue("productId", value);
+              }}
+            />
+          ) : null}
+          <TextField control={control} name="lang" label="Language" />
         </div>
 
         <div style={{ ...styles.row, marginTop: 10 }}>

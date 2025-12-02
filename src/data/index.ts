@@ -17,6 +17,10 @@ export enum BaseUrl {
   LOYALTY = "https://loyalty.kgen.global",
 }
 
+export const ProductIds: Partial<Record<StoreIdentifier, string[]>> = {
+  [StoreIdentifier.HT]: ["ht-news"],
+};
+
 type TConfig = {
   clientId: string;
   clientSecret: string;
@@ -46,6 +50,10 @@ export const STORE_MAP = {
   [HT]: {
     stores: [{ label: `HT - ${HT}`, value: HT }],
     baseUrls: [{ label: `K-Store - ${BaseUrl.KSTORE}`, value: BaseUrl.KSTORE }],
+    products: [{ label: "None", value: "" }].concat(
+      ProductIds[StoreIdentifier.HT]?.map((id) => ({ label: id, value: id })) ||
+        []
+    ),
   },
   [TIMES]: {
     stores: [{ label: `Times - ${TIMES}`, value: TIMES }],
@@ -53,15 +61,6 @@ export const STORE_MAP = {
       { label: `K-Store - ${BaseUrl.KSTORE}`, value: BaseUrl.KSTORE },
       { label: `Loyalty - ${BaseUrl.LOYALTY}`, value: BaseUrl.LOYALTY },
     ],
-  },
-  ALL: {
-    stores: [
-      { label: `HT - ${HT}`, value: HT },
-      { label: `Times - ${TIMES}`, value: TIMES },
-    ],
-    baseUrls: [
-      { label: `K-Store - ${BaseUrl.KSTORE}`, value: BaseUrl.KSTORE },
-      { label: `Loyalty - ${BaseUrl.LOYALTY}`, value: BaseUrl.LOYALTY },
-    ],
+    products: [],
   },
 };
