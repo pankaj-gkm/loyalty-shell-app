@@ -1,19 +1,21 @@
 {
-  "name": "ht",
+  "name": "loyalty-shell-app",
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "homepage": "https://pankaj-gkm.github.io/HT/",
+  "homepage": "https://pankaj-gkm.github.io/loyalty-shell-app/",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "predeploy": "npm run build",
-    "deploy": "gh-pages -d dist"
+    "deploy": "gh-pages -d dist",
+    "postbuild": "cp dist/index.html dist/404.html"
   },
   "dependencies": {
     "crypto-js": "^4.2.0",
+    "react-router-dom": "^6.20.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-hook-form": "^7.62.0",

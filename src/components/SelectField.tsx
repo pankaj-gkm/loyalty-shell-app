@@ -38,7 +38,7 @@ export type SelectFieldProps<T extends FieldValues> = {
   onChange?: React.ChangeEventHandler<HTMLSelectElement>;
 } & React.SelectHTMLAttributes<HTMLSelectElement>;
 
-export function SelectField<T extends FieldValues>({
+export function FormSelectField<T extends FieldValues>({
   name,
   control,
   label,
@@ -71,6 +71,33 @@ export function SelectField<T extends FieldValues>({
           </select>
         )}
       />
+    </div>
+  );
+}
+
+export function SelectField<T extends FieldValues>({
+  label,
+  options,
+  onChange,
+  ...props
+}: Omit<SelectFieldProps<T>, "control" | "name" | "onChange"> & {
+  onChange: React.ChangeEventHandler<HTMLSelectElement>;
+}) {
+  return (
+    <div style={containerStyle}>
+      {label && <label style={labelStyle}>{label}</label>}
+
+      <select
+        onChange={(...props) => onChange?.(...props)}
+        {...props}
+        style={selectStyle}
+      >
+        {options.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }

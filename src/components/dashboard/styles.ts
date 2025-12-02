@@ -30,4 +30,19 @@ export const styles = {
     whiteSpace: "pre-wrap",
     overflow: "scroll",
   },
+  quickLinks: {
+    display: "flex",
+    gap: 4,
+    justifyContent: "center",
+  },
+  redirectLinks: {
+    display: "block",
+    height: 36,
+    paddingLeft: 12,
+    paddingRight: 12,
+    background: "black",
+    borderRadius: 8,
+    alignContent: "center",
+    color: "white",
+  },
 } satisfies Record<string, CSSProperties>;

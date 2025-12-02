@@ -7,33 +7,17 @@ import { styles } from "./styles";
 import RefreshIcon from "../../assets/refresh";
 import { SelectField } from "../SelectField";
 import { CheckboxField } from "../CheckboxField";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { entries, fromEntries } from "../../utils/helpers";
 import uuid4 from "uuid4";
-
-enum StoreIdentifier {
-  HT = "ht-kstore-india",
-  TIMES = "times-now-kstore-india",
-}
-
-enum BaseUrl {
-  KSTORE = "https://stage.kstore.global",
-  LOYALTY = "https://loyalty.kgen.global",
-}
-
-const { HT, TIMES } = StoreIdentifier;
-const { KSTORE, LOYALTY } = BaseUrl;
-
-const CLIENT_ID_MAP = {
-  [StoreIdentifier.HT]: {
-    id: "209cbe38-abf2-4673-8c86-f1be4942eacc",
-    secret: "f3mm1OKppwdfd7Wtu2F8YMCwlOWOXH680kPmEzP02d",
-  },
-  [StoreIdentifier.TIMES]: {
-    id: "102493df-fead-4a01-ae93-a5a7fbbadc8d",
-    secret: "0aRxAQe7wKaMxAvKcBDQ3DSEVu7uYxHFmP4WKJMrVkr",
-  },
-};
+import { useParams } from "react-router-dom";
+import {
+  BaseUrl,
+  CLIENT_ID_MAP,
+  isValidStoreIdentifier,
+  STORE_MAP,
+  StoreIdentifier,
+} from "../../data";
 
 const getEncryptedToken = (token: string) => {
   const key = CryptoJS.enc.Utf8.parse("aKpQzRtd"); // salt should be taken from env
@@ -50,63 +34,93 @@ const getEncryptedToken = (token: string) => {
   return encrypted?.toString();
 };
 
-const getClientIdAndSecret = (
-  isStaging: boolean,
-  storeIdentifier: StoreIdentifier
-) => {
-  if (!isStaging) {
-    return { id: undefined, secret: undefined };
+const getLocalValue = <T extends keyof Form>(
+  key: T,
+  defaultValue: Form[T]
+): Form[T] => {
+  try {
+    return JSON.parse(localStorage.getItem(key) || "") || defaultValue;
+  } catch {
+    return defaultValue;
   }
-
-  return CLIENT_ID_MAP[storeIdentifier];
 };
+
+const QUICK_LINKS = [
+  { link: "http://localhost:3000", name: "3000" },
+  { link: "http://localhost:3001", name: "3001" },
+  { link: "http://localhost:5173", name: "5173" },
+  { link: "http://localhost:4173", name: "4173" },
+  { link: "https://stage2.kstore.global/", name: "stage2" },
+];
 
 const DEFAULT_VALUES = {
-  isStaging: true,
+  isStaging: getLocalValue("isStaging", true),
   userId: "efd19263-aaae-433e-9fea-a302b5d73ce6",
-  continueCtaTitle: "Continue Reading",
-  continueCtaUrl: "https://www.hindustantimes.com/sports",
-  orderHistoryRedirectionUrl: "https://www.hindustantimes.com/order-history",
-  storeIdentifier: StoreIdentifier.HT,
-  useCustomBaseUrl: true,
-  baseUrl: KSTORE,
-  customBaseUrl: "http://localhost:3000",
-  clientId: CLIENT_ID_MAP[StoreIdentifier.HT].id,
-  clientSecret: CLIENT_ID_MAP[StoreIdentifier.HT].secret,
+  useCustomBaseUrl: getLocalValue("useCustomBaseUrl", true),
+  customBaseUrl: getLocalValue("customBaseUrl", "http:localhost:5173"),
 };
 
-type Form = typeof DEFAULT_VALUES;
+type Form = {
+  isStaging: boolean;
+  userId: string;
+  continueCtaTitle: string;
+  continueCtaUrl: string;
+  orderHistoryRedirectionUrl: string;
+  useCustomBaseUrl: boolean;
+  baseUrl: BaseUrl;
+  customBaseUrl: string;
+  clientId: string;
+  clientSecret: string;
+};
+
+const handleFormValues = (
+  oldForm: Omit<Form, "baseUrl">,
+  storeIdentifier: StoreIdentifier
+) => {
+  const form: Form = {
+    ...oldForm,
+    baseUrl: STORE_MAP[storeIdentifier].baseUrls[0].value,
+  };
+
+  if (!form.isStaging) {
+    form.clientId = "";
+    form.clientSecret = "";
+  } else {
+    const { clientId, clientSecret } = CLIENT_ID_MAP[storeIdentifier];
+    form.clientId = clientId;
+    form.clientSecret = clientSecret;
+  }
+
+  return form;
+};
+
 const VALUES_TO_EXCLUDE = [
   "clientId",
   "clientSecret",
   "userId",
 ] as (keyof Form)[];
 
-const Dashboard = () => {
-  const localForm = localStorage.getItem("form");
-
-  const defaultValues =
-    (localForm && (JSON.parse(localForm) as Form)) || DEFAULT_VALUES;
-  const { id, secret } = getClientIdAndSecret(
-    defaultValues.isStaging,
-    defaultValues.storeIdentifier
-  );
-
+const Dashboard = ({
+  storeIdentifier,
+}: {
+  storeIdentifier: StoreIdentifier;
+}) => {
   const form = useForm<Form>({
-    defaultValues: {
-      ...DEFAULT_VALUES,
-      ...defaultValues,
-      clientId: id,
-      clientSecret: secret,
-    },
+    defaultValues: handleFormValues(
+      { ...DEFAULT_VALUES, ...CLIENT_ID_MAP[storeIdentifier] },
+      storeIdentifier
+    ),
   });
 
-  const [sessionToken, setSessionToken] = useState();
-  const [isIframeOpen, setIsIframeOpen] = useState(false);
+  const [iframeOptions, setIframeOptions] = useState<{
+    isOpen: boolean;
+    token?: string;
+  }>({ isOpen: false });
 
   const { control, getValues } = form;
 
   const formValues = useWatch({ control });
+  const isDevMode = JSON.parse(localStorage.getItem("isDevMode") || "false");
 
   useEffect(() => {
     const values = { ...formValues };
@@ -120,17 +134,43 @@ const Dashboard = () => {
     }
   }, [formValues]);
 
+  const getSessionToken = useCallback(async (user?: string) => {
+    const values = form.getValues();
+
+    const tokens = {
+      "x-client-id": values.clientId,
+      "x-client-secret": values.clientSecret,
+    };
+
+    const loyaltyProtocolBaseUrl = values.isStaging
+      ? "https://stage-platform-protocols.kgen.io"
+      : "https://prod-platform-protocols.kgen.io";
+
+    const data = await fetch(`${loyaltyProtocolBaseUrl}/s2s/session`, {
+      method: "POST",
+      headers: { ...tokens, "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: user || values.userId }),
+    });
+
+    const { token } = (await data.json()) || {};
+    setIframeOptions({ isOpen: false, token: getEncryptedToken(token) });
+  }, []); // eslint-disable-line
+
+  useEffect(() => {
+    getSessionToken();
+  }, [formValues.userId, getSessionToken]);
+
   const getParams = () => {
     const values = getValues();
 
     const p = (v?: string) => (v ? v : undefined);
 
     const params = entries({
-      storeIdentifier: p(values.storeIdentifier),
+      storeIdentifier: p(storeIdentifier),
       continueCtaTitle: p(values.continueCtaTitle),
       continueCtaRedirectionUrl: p(values.continueCtaUrl),
       orderHistoryRedirectionUrl: p(values.orderHistoryRedirectionUrl),
-      sessionToken: p(sessionToken),
+      sessionToken: p(iframeOptions.token),
     })
       .map(([key, value]) => (value ? ([key, value] as const) : undefined))
       .filter((v) => !!v);
@@ -160,41 +200,6 @@ const Dashboard = () => {
     }
   }
 
-  const getSessionToken = (user?: string) => {
-    const values = getValues();
-
-    const tokens = {
-      "x-client-id": values.clientId,
-      "x-client-secret": values.clientSecret,
-    };
-
-    const loyaltyProtocolBaseUrl = values.isStaging
-      ? "https://stage-platform-protocols.kgen.io"
-      : "https://prod-platform-protocols.kgen.io";
-
-    fetch(`${loyaltyProtocolBaseUrl}/s2s/session`, {
-      method: "POST",
-      headers: { ...tokens, "Content-Type": "application/json" },
-      body: JSON.stringify({ user_id: user || values.userId }),
-    })
-      .then((response) => response.json())
-      .then((data) => {
-        return setSessionToken(getEncryptedToken(data.token));
-      })
-      .catch((error) => console.error("Error:", error));
-  };
-
-  const setClientIdAndSecret = (
-    storeIdentifier: StoreIdentifier,
-    passedIsStaging?: boolean
-  ) => {
-    const isStaging = passedIsStaging ?? getValues().isStaging;
-    const { id, secret } = getClientIdAndSecret(isStaging, storeIdentifier);
-
-    form.setValue("clientId", id || "");
-    form.setValue("clientSecret", secret || "");
-  };
-
   function getRedirectUrl(): string {
     const params = getParams();
     const { baseUrl, customBaseUrl, useCustomBaseUrl } = getValues();
@@ -203,7 +208,11 @@ const Dashboard = () => {
     return `${path}?${params.toString()}`;
   }
 
-  if (isIframeOpen) {
+  async function handleSubmitClick() {
+    setIframeOptions((prev) => ({ ...prev, isOpen: true }));
+  }
+
+  if (iframeOptions.isOpen) {
     return (
       <iframe
         src={getRedirectUrl()}
@@ -225,11 +234,7 @@ const Dashboard = () => {
           />
           <button
             style={styles.refreshButton}
-            onClick={() => {
-              const user = uuid4();
-              form.setValue("userId", user);
-              getSessionToken(user);
-            }}
+            onClick={() => form.setValue("userId", uuid4())}
           >
             <RefreshIcon />
           </button>
@@ -237,7 +242,7 @@ const Dashboard = () => {
             style={styles.createSessionButton}
             onClick={() => getSessionToken()}
           >
-            <span>Create Session</span>
+            Create Session
           </button>
         </div>
 
@@ -260,19 +265,6 @@ const Dashboard = () => {
         </div>
 
         <div style={styles.row}>
-          <SelectField
-            control={control}
-            label="Store"
-            name="storeIdentifier"
-            options={[
-              { label: `HT - ${HT}`, value: HT },
-              { label: `Times - ${TIMES}`, value: TIMES },
-            ]}
-            onChange={({ target: { value } }) => {
-              setClientIdAndSecret(value as StoreIdentifier);
-              setSessionToken(undefined);
-            }}
-          />
           <TextField control={control} name="clientId" label="Client ID" />
           <TextField
             control={control}
@@ -287,29 +279,29 @@ const Dashboard = () => {
             name="isStaging"
             label="Stage Env"
             onChange={({ target: { checked } }) => {
-              if (checked) {
-                setClientIdAndSecret(getValues().storeIdentifier, checked);
-              } else {
-                form.setValue("clientId", "");
-                form.setValue("clientSecret", "");
-              }
+              form.reset(
+                handleFormValues(
+                  { ...form.getValues(), isStaging: checked },
+                  storeIdentifier
+                )
+              );
             }}
           />
 
           <SelectField
-            control={control}
-            name="baseUrl"
-            options={[
-              { label: `K-Store - ${KSTORE}`, value: KSTORE },
-              { label: `Loyalty - ${LOYALTY}`, value: LOYALTY },
-            ]}
+            options={STORE_MAP[storeIdentifier].baseUrls}
             disabled={getValues().useCustomBaseUrl}
+            onChange={({ target: { value } }) =>
+              form.setValue("baseUrl", value as BaseUrl)
+            }
           />
+
           <CheckboxField
             control={control}
             name="useCustomBaseUrl"
             label="Use Custom Base URL"
           />
+
           <TextField
             control={control}
             name="customBaseUrl"
@@ -317,25 +309,55 @@ const Dashboard = () => {
           />
         </div>
 
-        <div>
-          <button
-            disabled={!sessionToken}
-            onClick={() => setIsIframeOpen(true)}
-          >
+        <div style={styles.quickLinks}>
+          <button onClick={handleSubmitClick} disabled={!iframeOptions.token}>
             Redirect
           </button>
+          {QUICK_LINKS.map(({ link, name }) => (
+            <button
+              onClick={() => {
+                form.setValue("useCustomBaseUrl", true);
+                form.setValue("customBaseUrl", link);
+                handleSubmitClick();
+              }}
+              hidden={!isDevMode}
+              disabled={!iframeOptions.token}
+            >
+              {name}
+            </button>
+          ))}
         </div>
 
         <div
           dangerouslySetInnerHTML={{
-            __html: highlightSearchParams(sessionToken || ""),
+            __html: highlightSearchParams(iframeOptions.token || ""),
           }}
           style={styles.redirectUriField}
           className="redirectField"
         />
       </FormProvider>
+
+      {isDevMode && (
+        <div style={styles.quickLinks}>
+          {Object.values(StoreIdentifier).map((id) => (
+            <a style={styles.redirectLinks} href={`/loyalty-shell-app/${id}`}>
+              {id}
+            </a>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
 
-export default Dashboard;
+const DashboardWrapper = () => {
+  const { storeIdentifier } = useParams();
+
+  if (!isValidStoreIdentifier(storeIdentifier)) {
+    return <div>Not valid Store Identifier</div>;
+  }
+
+  return <Dashboard storeIdentifier={storeIdentifier} />;
+};
+
+export default DashboardWrapper;
