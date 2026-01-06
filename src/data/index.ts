@@ -12,10 +12,16 @@ export function isValidStoreIdentifier(
   return Object.values(StoreIdentifier).includes(identifier as StoreIdentifier);
 }
 
-export enum BaseUrl {
-  KSTORE = "https://stage.kstore.global",
-  LOYALTY = "https://loyalty.kgen.global",
-}
+export const BaseUrl = {
+  staging: {
+    KSTORE: "https://stage.kstore.global",
+    LOYALTY: "https://loyalty.kgen.global",
+  },
+  prod: {
+    KSTORE: "https://kstore.global",
+    LOYALTY: "https://loyalty.kgen.io",
+  },
+};
 
 export const ProductIds: Partial<Record<StoreIdentifier, string[]>> = {
   [StoreIdentifier.HT]: ["ht-news"],
@@ -46,21 +52,27 @@ export const CLIENT_ID_MAP: Record<StoreIdentifier, TConfig> = {
   },
 };
 
-export const STORE_MAP = {
-  [HT]: {
-    stores: [{ label: `HT - ${HT}`, value: HT }],
-    baseUrls: [{ label: `K-Store - ${BaseUrl.KSTORE}`, value: BaseUrl.KSTORE }],
-    products: [{ label: "None", value: "" }].concat(
-      ProductIds[StoreIdentifier.HT]?.map((id) => ({ label: id, value: id })) ||
-        []
-    ),
-  },
-  [TIMES]: {
-    stores: [{ label: `Times - ${TIMES}`, value: TIMES }],
-    baseUrls: [
-      { label: `K-Store - ${BaseUrl.KSTORE}`, value: BaseUrl.KSTORE },
-      { label: `Loyalty - ${BaseUrl.LOYALTY}`, value: BaseUrl.LOYALTY },
-    ],
-    products: [],
-  },
+export const STORE_MAP = (isStaging: boolean = false) => {
+  const { KSTORE, LOYALTY } = BaseUrl[isStaging ? "staging" : "prod"];
+
+  return {
+    [HT]: {
+      stores: [{ label: `HT - ${HT}`, value: HT }],
+      baseUrls: [{ label: `K-Store - ${KSTORE}`, value: KSTORE }],
+      products: [{ label: "None", value: "" }].concat(
+        ProductIds[StoreIdentifier.HT]?.map((id) => ({
+          label: id,
+          value: id,
+        })) || []
+      ),
+    },
+    [TIMES]: {
+      stores: [{ label: `Times - ${TIMES}`, value: TIMES }],
+      baseUrls: [
+        { label: `K-Store - ${KSTORE}`, value: KSTORE },
+        { label: `Loyalty - ${LOYALTY}`, value: LOYALTY },
+      ],
+      products: [],
+    },
+  };
 };

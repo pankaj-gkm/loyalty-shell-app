@@ -19,8 +19,18 @@ import {
   StoreIdentifier,
 } from "../../data";
 
-const getEncryptedToken = (token: string) => {
-  const key = CryptoJS.enc.Utf8.parse("aKpQzRtd"); // salt should be taken from env
+const getEncryptedToken = (
+  token: string,
+  storeIdentifier: string,
+  isStaging: boolean = false
+) => {
+  const env = isStaging
+    ? import.meta.env.VITE_LOYALTY_SALT_STAGING
+    : import.meta.env.VITE_LOYALTY_SALT_PROD;
+
+  const salt = JSON.parse(env)[storeIdentifier];
+
+  const key = CryptoJS.enc.Utf8.parse(salt);
   const encrypted = CryptoJS.AES.encrypt(
     CryptoJS.enc.Utf8.parse(token?.toString()),
     key,
@@ -39,7 +49,9 @@ const getLocalValue = <T extends keyof Form>(
   defaultValue: Form[T]
 ): Form[T] => {
   try {
-    return JSON.parse(localStorage.getItem(key) || "") || defaultValue;
+    return (
+      JSON.parse(localStorage.getItem("form") || "{}")?.[key] ?? defaultValue
+    );
   } catch {
     return defaultValue;
   }
@@ -58,7 +70,7 @@ const DEFAULT_VALUES = {
   isStaging: getLocalValue("isStaging", true),
   userId: "efd19263-aaae-433e-9fea-a302b5d73ce6",
   useCustomBaseUrl: getLocalValue("useCustomBaseUrl", true),
-  customBaseUrl: getLocalValue("customBaseUrl", "http:localhost:5173"),
+  customBaseUrl: getLocalValue("customBaseUrl", "http://localhost:5173"),
   productId: "",
   lang: "en",
 };
@@ -70,7 +82,7 @@ type Form = {
   continueCtaUrl: string;
   orderHistoryRedirectionUrl: string;
   useCustomBaseUrl: boolean;
-  baseUrl: BaseUrl;
+  baseUrl: (typeof BaseUrl)["staging"]["KSTORE"];
   customBaseUrl: string;
   clientId: string;
   clientSecret: string;
@@ -80,11 +92,12 @@ type Form = {
 
 const handleFormValues = (
   oldForm: Omit<Form, "baseUrl">,
-  storeIdentifier: StoreIdentifier
+  storeIdentifier: StoreIdentifier,
+  isStaging?: boolean
 ) => {
   const form: Form = {
     ...oldForm,
-    baseUrl: STORE_MAP[storeIdentifier].baseUrls[0].value,
+    baseUrl: STORE_MAP(isStaging)[storeIdentifier].baseUrls[0].value,
   };
 
   if (!form.isStaging) {
@@ -115,9 +128,10 @@ const Dashboard = ({
       {
         ...DEFAULT_VALUES,
         ...CLIENT_ID_MAP[storeIdentifier],
-        productId: STORE_MAP["ht-kstore-india"]?.products[0]?.value,
+        productId: STORE_MAP(false)["ht-kstore-india"]?.products[0]?.value,
       },
-      storeIdentifier
+      storeIdentifier,
+      false
     ),
   });
 
@@ -162,7 +176,10 @@ const Dashboard = ({
     });
 
     const { token } = (await data.json()) || {};
-    setIframeOptions({ isOpen: false, token: getEncryptedToken(token) });
+    setIframeOptions({
+      isOpen: false,
+      token: getEncryptedToken(token, storeIdentifier, formValues.isStaging),
+    });
   }, []); // eslint-disable-line
 
   useEffect(() => {
@@ -285,10 +302,12 @@ const Dashboard = ({
         </div>
 
         <div style={styles.row}>
-          {STORE_MAP[storeIdentifier].products.length ? (
+          {STORE_MAP(formValues.isStaging)[storeIdentifier].products.length ? (
             <SelectField
               label="Product"
-              options={STORE_MAP[storeIdentifier].products}
+              options={
+                STORE_MAP(formValues.isStaging)[storeIdentifier].products
+              }
               onChange={({ target: { value } }) => {
                 form.setValue("productId", value);
               }}
@@ -306,17 +325,21 @@ const Dashboard = ({
               form.reset(
                 handleFormValues(
                   { ...form.getValues(), isStaging: checked },
-                  storeIdentifier
+                  storeIdentifier,
+                  checked
                 )
               );
             }}
           />
 
           <SelectField
-            options={STORE_MAP[storeIdentifier].baseUrls}
+            options={STORE_MAP(formValues.isStaging)[storeIdentifier].baseUrls}
             disabled={getValues().useCustomBaseUrl}
             onChange={({ target: { value } }) =>
-              form.setValue("baseUrl", value as BaseUrl)
+              form.setValue(
+                "baseUrl",
+                value as (typeof BaseUrl)["staging"]["KSTORE"]
+              )
             }
           />
 
