@@ -104,6 +104,8 @@ const Dashboard = ({
 }: {
   storeIdentifier: StoreIdentifier;
 }) => {
+  const isStaging = process.env.ENVIRONMENT === "Staging";
+
   const form = useForm<Form>({
     defaultValues: handleFormValues(
       {
@@ -112,11 +114,9 @@ const Dashboard = ({
         productId: STORE_MAP(false)["ht-kstore-india"]?.products[0]?.value,
       },
       storeIdentifier,
-      false
+      isStaging
     ),
   });
-
-  const isStaging = process.env.ENVIRONMENT === "Staging";
 
   const [iframeOptions, setIframeOptions] = useState<{
     isOpen: boolean;
