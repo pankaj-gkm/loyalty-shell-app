@@ -19,16 +19,10 @@ import {
   StoreIdentifier,
 } from "../../data";
 
-const getEncryptedToken = (
-  token: string,
-  storeIdentifier: string,
-  isStaging: boolean = false
-) => {
-  const env = isStaging
-    ? import.meta.env.VITE_LOYALTY_SALT_STAGING
-    : import.meta.env.VITE_LOYALTY_SALT_PROD;
+const getEncryptedToken = (token: string, storeIdentifier: StoreIdentifier) => {
+  const env = process.env.SALT! as unknown as Record<StoreIdentifier, string>;
 
-  const salt = JSON.parse(env)[storeIdentifier];
+  const salt = env[storeIdentifier];
 
   const key = CryptoJS.enc.Utf8.parse(salt);
   const encrypted = CryptoJS.AES.encrypt(
@@ -67,7 +61,6 @@ const QUICK_LINKS = [
 ];
 
 const DEFAULT_VALUES = {
-  isStaging: getLocalValue("isStaging", true),
   userId: "efd19263-aaae-433e-9fea-a302b5d73ce6",
   useCustomBaseUrl: getLocalValue("useCustomBaseUrl", true),
   customBaseUrl: getLocalValue("customBaseUrl", "http://localhost:5173"),
@@ -76,7 +69,6 @@ const DEFAULT_VALUES = {
 };
 
 type Form = {
-  isStaging: boolean;
   userId: string;
   continueCtaTitle: string;
   continueCtaUrl: string;
@@ -84,8 +76,6 @@ type Form = {
   useCustomBaseUrl: boolean;
   baseUrl: (typeof BaseUrl)["staging"]["KSTORE"];
   customBaseUrl: string;
-  clientId: string;
-  clientSecret: string;
   productId: string | undefined;
   lang: string | undefined;
 };
@@ -99,15 +89,6 @@ const handleFormValues = (
     ...oldForm,
     baseUrl: STORE_MAP(isStaging)[storeIdentifier].baseUrls[0].value,
   };
-
-  if (!form.isStaging) {
-    form.clientId = "";
-    form.clientSecret = "";
-  } else {
-    const { clientId, clientSecret } = CLIENT_ID_MAP[storeIdentifier];
-    form.clientId = clientId;
-    form.clientSecret = clientSecret;
-  }
 
   return form;
 };
@@ -135,6 +116,8 @@ const Dashboard = ({
     ),
   });
 
+  const isStaging = process.env.ENVIRONMENT === "Staging";
+
   const [iframeOptions, setIframeOptions] = useState<{
     isOpen: boolean;
     token?: string;
@@ -160,14 +143,19 @@ const Dashboard = ({
   const getSessionToken = useCallback(async (user?: string) => {
     const values = form.getValues();
 
+    const { id, secret } = (
+      process.env.CLIENT_INFO as unknown as Record<
+        StoreIdentifier,
+        Record<"id" | "secret", string>
+      >
+    )[storeIdentifier];
+
     const tokens = {
-      "x-client-id": values.clientId,
-      "x-client-secret": values.clientSecret,
+      "x-client-id": id,
+      "x-client-secret": secret,
     };
 
-    const loyaltyProtocolBaseUrl = values.isStaging
-      ? "https://stage-platform-protocols.kgen.io"
-      : "https://prod-platform-protocols.kgen.io";
+    const loyaltyProtocolBaseUrl = process.env.LOYALTY_PROTOCOL_BASE_URL;
 
     const data = await fetch(`${loyaltyProtocolBaseUrl}/s2s/session`, {
       method: "POST",
@@ -178,7 +166,7 @@ const Dashboard = ({
     const { token } = (await data.json()) || {};
     setIframeOptions({
       isOpen: false,
-      token: getEncryptedToken(token, storeIdentifier, formValues.isStaging),
+      token: getEncryptedToken(token, storeIdentifier),
     });
   }, []); // eslint-disable-line
 
@@ -293,21 +281,10 @@ const Dashboard = ({
         </div>
 
         <div style={styles.row}>
-          <TextField control={control} name="clientId" label="Client ID" />
-          <TextField
-            control={control}
-            name="clientSecret"
-            label="Client Secret"
-          />
-        </div>
-
-        <div style={styles.row}>
-          {STORE_MAP(formValues.isStaging)[storeIdentifier].products.length ? (
+          {STORE_MAP(isStaging)[storeIdentifier].products.length ? (
             <SelectField
               label="Product"
-              options={
-                STORE_MAP(formValues.isStaging)[storeIdentifier].products
-              }
+              options={STORE_MAP(isStaging)[storeIdentifier].products}
               onChange={({ target: { value } }) => {
                 form.setValue("productId", value);
               }}
@@ -317,23 +294,8 @@ const Dashboard = ({
         </div>
 
         <div style={{ ...styles.row, marginTop: 10 }}>
-          <CheckboxField
-            control={control}
-            name="isStaging"
-            label="Stage Env"
-            onChange={({ target: { checked } }) => {
-              form.reset(
-                handleFormValues(
-                  { ...form.getValues(), isStaging: checked },
-                  storeIdentifier,
-                  checked
-                )
-              );
-            }}
-          />
-
           <SelectField
-            options={STORE_MAP(formValues.isStaging)[storeIdentifier].baseUrls}
+            options={STORE_MAP(isStaging)[storeIdentifier].baseUrls}
             disabled={getValues().useCustomBaseUrl}
             onChange={({ target: { value } }) =>
               form.setValue(
