@@ -22,7 +22,7 @@ import {
 const getEncryptedToken = (
   token: string,
   storeIdentifier: string,
-  isStaging: boolean = false
+  isStaging: boolean = false,
 ) => {
   const env = isStaging
     ? import.meta.env.VITE_LOYALTY_SALT_STAGING
@@ -39,14 +39,14 @@ const getEncryptedToken = (
       iv: key,
       mode: CryptoJS.mode.CBC,
       padding: CryptoJS.pad.Pkcs7,
-    }
+    },
   );
   return encrypted?.toString();
 };
 
 const getLocalValue = <T extends keyof Form>(
   key: T,
-  defaultValue: Form[T]
+  defaultValue: Form[T],
 ): Form[T] => {
   try {
     return (
@@ -93,7 +93,7 @@ type Form = {
 const handleFormValues = (
   oldForm: Omit<Form, "baseUrl">,
   storeIdentifier: StoreIdentifier,
-  isStaging?: boolean
+  isStaging?: boolean,
 ) => {
   const form: Form = {
     ...oldForm,
@@ -123,15 +123,17 @@ const Dashboard = ({
 }: {
   storeIdentifier: StoreIdentifier;
 }) => {
+  const isStagingLocal = getLocalValue("isStaging", true);
   const form = useForm<Form>({
     defaultValues: handleFormValues(
       {
         ...DEFAULT_VALUES,
         ...CLIENT_ID_MAP[storeIdentifier],
-        productId: STORE_MAP(false)["ht-kstore-india"]?.products[0]?.value,
+        productId:
+          STORE_MAP(isStagingLocal)["ht-kstore-india"]?.products[0]?.value,
       },
       storeIdentifier,
-      false
+      isStagingLocal,
     ),
   });
 
@@ -218,8 +220,8 @@ const Dashboard = ({
         .map(
           ([key, value]) =>
             `<span style="color: #F0E68C; font-weight: bold;">${key}</span>=${encodeURIComponent(
-              value
-            )}`
+              value,
+            )}`,
         )
         .join("&");
       return `<span style="color: #FFA07A; font-weight: bold;">${path}</span>?${highlightedParams}`;
@@ -326,8 +328,8 @@ const Dashboard = ({
                 handleFormValues(
                   { ...form.getValues(), isStaging: checked },
                   storeIdentifier,
-                  checked
-                )
+                  checked,
+                ),
               );
             }}
           />
@@ -338,7 +340,7 @@ const Dashboard = ({
             onChange={({ target: { value } }) =>
               form.setValue(
                 "baseUrl",
-                value as (typeof BaseUrl)["staging"]["KSTORE"]
+                value as (typeof BaseUrl)["staging"]["KSTORE"],
               )
             }
           />

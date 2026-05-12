@@ -6,7 +6,7 @@ export enum StoreIdentifier {
 const { HT, TIMES } = StoreIdentifier;
 
 export function isValidStoreIdentifier(
-  identifier?: unknown
+  identifier?: unknown,
 ): identifier is StoreIdentifier {
   if (typeof identifier !== "string") return false;
   return Object.values(StoreIdentifier).includes(identifier as StoreIdentifier);
@@ -63,7 +63,7 @@ export const STORE_MAP = (isStaging: boolean = false) => {
         ProductIds[StoreIdentifier.HT]?.map((id) => ({
           label: id,
           value: id,
-        })) || []
+        })) || [],
       ),
     },
     [TIMES]: {
